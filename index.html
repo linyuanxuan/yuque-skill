@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="语雀 Skill：让 AI 直接确认账号、读写你的语雀知识库。零依赖 Python CLI，一个 YUQUE_TOKEN 即可接入 OpenAPI v2。">
+<title>语雀 Skill · 让 AI 直接读写你的语雀</title>
+<style>
+  :root{
+    --bg:#080b10; --panel:#0f151d; --panel-2:#0b1118; --panel-3:#131b25;
+    --line:#1c2532; --line-2:#293544;
+    --tx:#e8eef5; --tx-2:#95a3b4; --tx-3:#67748a;
+    --ok:#3fb950; --warn:#d29922; --err:#f85149;
+    --acc:#00b96b; --acc-2:#27d98c; --blue:#58a6ff; --purple:#bc8cff;
+    --mono:ui-monospace,SFMono-Regular,"Cascadia Code","JetBrains Mono",Consolas,"Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth; scroll-padding-top:80px}
+  body{
+    margin:0; background:var(--bg); color:var(--tx);
+    font:15px/1.7 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:
+      radial-gradient(1000px 520px at 50% -12%, rgba(0,185,107,.16), transparent 62%),
+      radial-gradient(760px 420px at 92% 8%, rgba(88,166,255,.07), transparent 60%);
+  }
+  .wrap{position:relative; z-index:1; max-width:1120px; margin:0 auto; padding:0 28px}
+  a{color:inherit}
+  code{font-family:var(--mono); font-size:.92em; color:var(--blue); background:rgba(88,166,255,.08); padding:1px 5px; border-radius:4px}
+
+  /* nav */
+  nav{position:sticky; top:0; z-index:40; background:rgba(8,11,16,.72); backdrop-filter:blur(14px); border-bottom:1px solid var(--line)}
+  .nav-in{max-width:1120px; margin:0 auto; padding:13px 28px; display:flex; align-items:center; gap:26px}
+  .brand{display:flex; align-items:center; gap:9px; font-weight:650; letter-spacing:-.01em; text-decoration:none; white-space:nowrap}
+  .brand .mark{width:24px; height:24px; border-radius:7px; background:linear-gradient(140deg,var(--acc),#0a8f56); display:grid; place-items:center; font-size:12px; color:#04120b; font-weight:800}
+  .nav-links{display:flex; gap:4px; margin-left:auto; overflow-x:auto; scrollbar-width:none}
+  .nav-links::-webkit-scrollbar{display:none}
+  .nav-links a{color:var(--tx-2); text-decoration:none; font-size:13px; padding:6px 11px; border-radius:7px; white-space:nowrap}
+  .nav-links a:hover{color:var(--tx); background:var(--panel-3)}
+  .nav-cta{font-size:12.5px; font-weight:600; color:#04120b; background:var(--acc); border-radius:7px; padding:6px 13px; text-decoration:none; white-space:nowrap}
+  .nav-cta:hover{background:var(--acc-2)}
+
+  /* hero */
+  header{padding:78px 0 44px}
+  .hero{display:grid; grid-template-columns:1.06fr .94fr; gap:52px; align-items:center}
+  .eyebrow{display:inline-flex; align-items:center; gap:9px; font-size:11.5px; letter-spacing:.15em; color:var(--tx-3); text-transform:uppercase; border:1px solid var(--line-2); border-radius:999px; padding:5px 13px}
+  .eyebrow i{width:6px; height:6px; border-radius:50%; background:var(--acc); box-shadow:0 0 0 3px rgba(0,185,107,.16); font-style:normal}
+  h1{margin:22px 0 18px; font-size:52px; line-height:1.14; letter-spacing:-.035em; font-weight:680}
+  h1 .g{background:linear-gradient(96deg,var(--acc-2),#5be0a8 60%,var(--blue)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .sub{color:var(--tx-2); font-size:16px; max-width:490px; margin:0}
+  .sub b{color:var(--tx); font-weight:600}
+  .hero-actions{display:flex; gap:12px; margin-top:30px; flex-wrap:wrap}
+  .btn{display:inline-flex; align-items:center; gap:8px; font-size:13.5px; font-weight:600; border-radius:9px; padding:10px 20px; text-decoration:none; border:1px solid transparent; cursor:pointer}
+  .btn-p{background:var(--acc); color:#04120b; border-color:var(--acc)}
+  .btn-p:hover{background:var(--acc-2)}
+  .btn-s{background:transparent; color:var(--tx); border-color:var(--line-2)}
+  .btn-s:hover{border-color:var(--tx-3); background:var(--panel-3)}
+
+  /* terminal */
+  .term{border:1px solid var(--line); border-radius:13px; background:linear-gradient(180deg,#0d141d,#080c12); overflow:hidden; box-shadow:0 24px 60px -20px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.02) inset}
+  .term-bar{display:flex; align-items:center; gap:7px; padding:10px 14px; border-bottom:1px solid var(--line); background:rgba(255,255,255,.018)}
+  .term-bar i{width:9px; height:9px; border-radius:50%; background:#2b3543; font-style:normal}
+  .term-bar i:first-child{background:#3a2b2b}
+  .term-bar span{margin-left:8px; font-family:var(--mono); font-size:11.5px; color:var(--tx-3)}
+  .term pre{margin:0; padding:16px 18px; font-family:var(--mono); font-size:12.3px; line-height:1.78; color:#c3d1e0; overflow-x:auto}
+  .term .c{color:#5d6b7d}
+  .term .k{color:var(--acc-2)}
+  .term .s{color:#8fce9b}
+  .term .n{color:#e0b878}
+
+  /* metrics */
+  .metrics{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:14px; overflow:hidden; margin-top:12px}
+  .metric{background:var(--panel-2); padding:20px 22px}
+  .metric .v{font-size:24px; font-weight:680; letter-spacing:-.02em; color:var(--tx)}
+  .metric .v em{font-size:14px; font-style:normal; color:var(--tx-3); font-weight:500; margin-left:5px}
+  .metric .k{font-size:12px; color:var(--tx-3); margin-top:2px}
+
+  /* section */
+  section{padding:76px 0 0}
+  .sec-head{max-width:660px; margin-bottom:34px}
+  .sec-n{font-family:var(--mono); font-size:12px; color:var(--acc); letter-spacing:.1em}
+  h2{margin:10px 0 10px; font-size:30px; letter-spacing:-.025em; font-weight:660}
+  .sec-head p{margin:0; color:var(--tx-2); font-size:14.5px}
+
+  /* features */
+  .feats{display:grid; grid-template-columns:repeat(3,1fr); gap:14px}
+  .feat{background:linear-gradient(180deg,var(--panel),var(--panel-2)); border:1px solid var(--line); border-radius:14px; padding:22px}
+  .feat .ic{width:32px; height:32px; border-radius:9px; display:grid; place-items:center; background:rgba(0,185,107,.1); border:1px solid rgba(0,185,107,.2); color:var(--acc-2); font-size:15px; margin-bottom:14px}
+  .feat h3{margin:0 0 7px; font-size:15px; font-weight:640}
+  .feat p{margin:0; font-size:13.5px; color:var(--tx-2); line-height:1.65}
+
+  /* scenarios */
+  .scen{display:grid; gap:10px; margin-top:16px}
+  .scen-row{display:grid; grid-template-columns:1fr 1.15fr; gap:14px; align-items:stretch; border:1px solid var(--line); border-radius:11px; background:var(--panel-2); overflow:hidden}
+  .scen-q{padding:15px 18px; display:flex; gap:11px; align-items:flex-start; border-right:1px solid var(--line)}
+  .scen-q .q{font-family:var(--mono); color:var(--acc); font-size:12px; margin-top:2px}
+  .scen-q p{margin:0; font-size:13.8px; color:var(--tx)}
+  .scen-c{padding:13px 16px; font-family:var(--mono); font-size:12px; color:var(--tx-2); display:flex; align-items:center; overflow-x:auto; white-space:nowrap; background:rgba(0,0,0,.25)}
+
+  /* steps */
+  .steps{display:grid; gap:14px; counter-reset:s}
+  .step{display:grid; grid-template-columns:38px 1fr; gap:16px; align-items:start}
+  .step-n{width:30px; height:30px; border-radius:9px; display:grid; place-items:center; font-family:var(--mono); font-size:13px; color:var(--acc); background:rgba(0,185,107,.1); border:1px solid rgba(0,185,107,.22)}
+  .step-b{min-width:0}
+  .step-b h3{margin:2px 0 6px; font-size:15.5px; font-weight:640}
+  .step-b > p{margin:0 0 12px; color:var(--tx-2); font-size:13.8px}
+
+  /* code block */
+  .code{position:relative; background:#070b10; border:1px solid var(--line); border-radius:10px}
+  .code pre{margin:0; padding:13px 15px; overflow-x:auto; font-family:var(--mono); font-size:12.3px; line-height:1.75; color:#c3d1e0; white-space:pre}
+  .code .copy{position:absolute; top:7px; right:7px; font:inherit; font-size:11px; color:var(--tx-2); background:rgba(28,37,50,.9); border:1px solid var(--line-2); border-radius:6px; padding:3px 9px; cursor:pointer}
+  .code .copy:hover{color:var(--acc); border-color:var(--acc)}
+  .code .copy.done{color:var(--ok); border-color:rgba(63,185,80,.5)}
+  .tabs{display:inline-flex; gap:3px; padding:3px; background:var(--panel-2); border:1px solid var(--line); border-radius:8px; margin-bottom:10px}
+  .tabs button{font:inherit; font-size:12px; color:var(--tx-2); background:none; border:0; padding:5px 12px; border-radius:6px; cursor:pointer}
+  .tabs button[aria-selected="true"]{background:var(--line); color:var(--tx)}
+
+  /* table */
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel-2)); border:1px solid var(--line); border-radius:14px; overflow:hidden}
+  .card-h{display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid var(--line); flex-wrap:wrap}
+  .card-h b{font-size:14px; font-weight:620}
+  table{width:100%; border-collapse:collapse; font-size:13.2px}
+  th{text-align:left; font-weight:500; font-size:11.5px; letter-spacing:.06em; color:var(--tx-3); padding:10px 16px; border-bottom:1px solid var(--line); background:rgba(255,255,255,.014); white-space:nowrap}
+  td{padding:11px 16px; border-bottom:1px solid rgba(28,37,50,.65); vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:rgba(255,255,255,.018)}
+  td.mono{font-family:var(--mono); font-size:12.2px}
+  .dim{color:var(--tx-2)}
+  .faint{color:var(--tx-3)}
+
+  .b{display:inline-flex; align-items:center; font-size:11.5px; font-weight:600; padding:2px 8px; border-radius:999px; white-space:nowrap; line-height:1.7}
+  .b-ok{color:#56d364; background:rgba(63,185,80,.13); box-shadow:inset 0 0 0 1px rgba(63,185,80,.26)}
+  .b-warn{color:#e3b341; background:rgba(210,153,34,.13); box-shadow:inset 0 0 0 1px rgba(210,153,34,.26)}
+  .b-err{color:#ff7b72; background:rgba(248,81,73,.13); box-shadow:inset 0 0 0 1px rgba(248,81,73,.28)}
+  .b-info{color:#79c0ff; background:rgba(88,166,255,.12); box-shadow:inset 0 0 0 1px rgba(88,166,255,.24)}
+  .b-purple{color:#d2a8ff; background:rgba(188,140,255,.12); box-shadow:inset 0 0 0 1px rgba(188,140,255,.24)}
+
+  .chips{display:flex; gap:7px; flex-wrap:wrap; margin-left:auto}
+  .chip{font:inherit; font-size:12px; color:var(--tx-2); cursor:pointer; background:var(--panel-2); border:1px solid var(--line); border-radius:999px; padding:4px 12px}
+  .chip[aria-pressed="true"]{color:#04120b; background:var(--acc); border-color:var(--acc); font-weight:600}
+  .chip span{opacity:.62; margin-left:5px}
+
+  /* security + faq */
+  .split{display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start}
+  ul.clean{margin:0; padding-left:18px; color:var(--tx-2); font-size:13.6px}
+  ul.clean li{margin:8px 0}
+  ul.clean code{font-family:var(--mono); font-size:12px; color:var(--blue); background:rgba(88,166,255,.08); padding:1px 5px; border-radius:4px}
+  details{border-bottom:1px solid var(--line)}
+  details:last-child{border-bottom:none}
+  summary{cursor:pointer; padding:14px 18px; font-size:13.8px; font-weight:600; list-style:none; display:flex; align-items:center; gap:10px}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"+"; font-family:var(--mono); color:var(--acc); font-size:14px; width:12px}
+  details[open] summary::before{content:"−"}
+  details p{margin:0; padding:0 18px 16px 40px; color:var(--tx-2); font-size:13.4px}
+  details code{font-family:var(--mono); font-size:12px; color:var(--blue)}
+
+  footer{margin-top:84px; border-top:1px solid var(--line); padding:28px 0 60px}
+  .foot-in{max-width:1120px; margin:0 auto; padding:0 28px; display:flex; gap:20px; flex-wrap:wrap; align-items:center; color:var(--tx-3); font-size:12.5px}
+  .foot-in a{color:var(--tx-2); text-decoration:none; border-bottom:1px solid var(--line-2)}
+  .foot-in a:hover{color:var(--acc); border-color:var(--acc)}
+
+  @media (max-width:920px){
+    .hero{grid-template-columns:1fr; gap:34px}
+    h1{font-size:38px}
+    .feats{grid-template-columns:1fr}
+    .metrics{grid-template-columns:1fr 1fr}
+    .split{grid-template-columns:1fr}
+    .scen-row{grid-template-columns:1fr}
+    .scen-q{border-right:none; border-bottom:1px solid var(--line)}
+    nav{padding:0}
+    .nav-in{padding:12px 18px; gap:14px}
+    .nav-links{display:none}
+    .wrap{padding:0 18px}
+    .foot-in{padding:0 18px}
+    section{padding-top:58px}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-in">
+    <a class="brand" href="#top"><span class="mark">语</span>yuque-skill</a>
+    <div class="nav-links">
+      <a href="#what">它能做什么</a>
+      <a href="#start">快速开始</a>
+      <a href="#commands">命令</a>
+      <a href="#safe">安全</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <a class="nav-cta" href="#start">开始使用</a>
+  </div>
+</nav>
+
+<header id="top">
+  <div class="wrap">
+    <div class="hero">
+      <div>
+        <span class="eyebrow"><i></i>Yuque OpenAPI v2 · Zero Dependency</span>
+        <h1>让 AI 直接<br><span class="g">读写你的语雀</span></h1>
+        <p class="sub">
+          一个 <b>零依赖的 Python CLI</b>，封装语雀 OpenAPI v2。
+          配好一个 <b>YUQUE_TOKEN</b>，就能让 AI 确认账号身份、翻你的知识库、把文档读出来、写回去。
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-p" href="#start">三分钟接上</a>
+          <a class="btn btn-s" href="#commands">看能做什么</a>
+        </div>
+      </div>
+
+      <div class="term">
+        <div class="term-bar"><i></i><i></i><i></i><span>yuque.py — whoami</span></div>
+        <pre><span class="c"># 确认这个 Token 是谁的</span>
+<span class="k">$</span> python yuque.py whoami
+{
+  <span class="s">"data"</span>: {
+    <span class="s">"login"</span>: <span class="s">"your-login"</span>,
+    <span class="s">"name"</span>:  <span class="s">"你的昵称"</span>,
+    <span class="s">"books_count"</span>: <span class="n">8</span>
+  }
+}
+
+<span class="c"># 顺藤摸瓜，列知识库</span>
+<span class="k">$</span> python yuque.py repos your-login
+<span class="c">→ 8 个知识库，含 slug / 名称 / 篇数</span></pre>
+      </div>
+    </div>
+
+    <div class="metrics">
+      <div class="metric"><div class="v">20<em>个</em></div><div class="k">子命令全覆盖</div></div>
+      <div class="metric"><div class="v">0<em>依赖</em></div><div class="k">只用 Python 标准库</div></div>
+      <div class="metric"><div class="v">1<em>个域名</em></div><div class="k">只访问 yuque.com</div></div>
+      <div class="metric"><div class="v">3.8<em>+</em></div><div class="k">Python 版本要求</div></div>
+    </div>
+  </div>
+</header>
+
+<section id="what">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-n">01 — CAPABILITY</div>
+      <h2>它不是「查一下」，是「替你动手」</h2>
+      <p>读、写、改、删、建目录，全都能通过一句话交给 AI 执行。你只需要把 Token 交给自己这台机器。</p>
+    </div>
+
+    <div class="feats">
+      <div class="feat">
+        <div class="ic">◎</div>
+        <h3>确认账号与权限</h3>
+        <p><code style="font-family:var(--mono);font-size:12px;color:var(--blue)">whoami</code> 拿到 login、昵称、知识库数量，先确认这个 Token 是谁的、能碰到什么。</p>
+      </div>
+      <div class="feat">
+        <div class="ic">⇄</div>
+        <h3>双向读写</h3>
+        <p>本地 Markdown 直接推到语雀，语雀正文拉回本地成 .md。支持创建、更新、删除文档与知识库。</p>
+      </div>
+      <div class="feat">
+        <div class="ic">⌗</div>
+        <h3>目录也能改</h3>
+        <p>新建文档默认不进目录。TOC 接口可以挂节点、调顺序、建分组，把结构一起维护好。</p>
+      </div>
+    </div>
+
+    <div class="scen">
+      <div class="scen-row">
+        <div class="scen-q"><span class="q">▸</span><p>把 <code style="font-family:var(--mono);font-size:12px">./周报.md</code> 发到「团队 / 周报」知识库</p></div>
+        <div class="scen-c">doc-create team weekly --title "本周周报" --body-md ./周报.md</div>
+      </div>
+      <div class="scen-row">
+        <div class="scen-q"><span class="q">▸</span><p>把某个知识库的文章全部导出成 Markdown</p></div>
+        <div class="scen-c">docs team repo → 循环 doc → 落盘 .md</div>
+      </div>
+      <div class="scen-row">
+        <div class="scen-q"><span class="q">▸</span><p>查一下「接口文档」那篇现在写了什么</p></div>
+        <div class="scen-c">doc team repo api-spec</div>
+      </div>
+      <div class="scen-row">
+        <div class="scen-q"><span class="q">▸</span><p>随手记一条今天的进展</p></div>
+        <div class="scen-c">note-create --body "今天把导出脚本跑通了"</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="start">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-n">02 — QUICK START</div>
+      <h2>三步接上</h2>
+      <p>不需要 pip install，不需要装 SDK。有 Python 3.8+ 和一个 Token 就够了。</p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">1</div>
+        <div class="step-b">
+          <h3>放好 skill 目录</h3>
+          <p>把 <code style="font-family:var(--mono);font-size:12px;color:var(--blue)">yuque/</code> 放到 skills 目录下。</p>
+          <div class="code">
+            <button class="copy" data-copy="c1">复制</button>
+            <pre id="c1">~/.workbuddy/skills/yuque/
+├── SKILL.md
+├── references/api.md
+└── scripts/yuque.py</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">2</div>
+        <div class="step-b">
+          <h3>拿 Token 并写进环境变量</h3>
+          <p>打开 <a href="https://www.yuque.com/settings/tokens" target="_blank" rel="noopener" style="color:var(--acc);text-decoration:none">语雀 → 设置 → 开发者 → Token</a> 新建，勾读权限（要写文档再勾写）。<b style="color:var(--tx)">只显示一次，当场复制。</b></p>
+          <div class="tabs" role="tablist" id="shellTabs">
+            <button role="tab" aria-selected="true" data-sh="ps">PowerShell</button>
+            <button role="tab" aria-selected="false" data-sh="bash">Bash / macOS</button>
+          </div>
+          <div class="code">
+            <button class="copy" data-copy="c2">复制</button>
+            <pre id="c2"></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">3</div>
+        <div class="step-b">
+          <h3>验证身份</h3>
+          <p>跑通 <code style="font-family:var(--mono);font-size:12px;color:var(--blue)">whoami</code>，返回 login 就说明接通了。</p>
+          <div class="code">
+            <button class="copy" data-copy="c3">复制</button>
+            <pre id="c3"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="commands">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-n">03 — COMMANDS</div>
+      <h2>20 个子命令</h2>
+      <p>按风险分成四档。只读随便调，写入和删除前先看清楚目标。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-h">
+        <b>命令清单</b>
+        <div class="chips" id="riskChips"></div>
+      </div>
+      <table>
+        <thead><tr><th class="mono">命令</th><th>作用</th><th style="width:76px">风险</th><th class="mono">对应 API</th></tr></thead>
+        <tbody id="cmdRows"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="safe">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-n">04 — SAFETY</div>
+      <h2>它能碰到什么，碰不到什么</h2>
+      <p>这东西能改你的知识库，所以边界要写清楚。</p>
+    </div>
+    <div class="split">
+      <div class="card">
+        <div class="card-h"><b>行为边界</b></div>
+        <div style="padding:18px">
+          <ul class="clean">
+            <li>出网只有一个域名：<code>www.yuque.com</code>，不连任何第三方。</li>
+            <li>只读环境变量里的 <code>YUQUE_TOKEN</code>，不写日志、不外传。</li>
+            <li>不写本地文件（除了你明确指定的 <code>--body-md</code> 输入）。</li>
+            <li>没有子进程、没有 <code>eval</code>、没有混淆代码。</li>
+            <li>纯标准库，不需要 <code>pip install</code>，无供应链风险。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><b>风险提示</b></div>
+        <div style="padding:18px">
+          <ul class="clean">
+            <li><span class="b b-err" style="margin-right:6px">删除</span><code>repo-delete</code> / <code>doc-delete</code> 不可逆，没有回收站兜底。</li>
+            <li><span class="b b-warn" style="margin-right:6px">写入</span>会让内容出现在团队里，别人看得见。</li>
+            <li>Token 等同于账号权限，别写进仓库、别贴进聊天记录。</li>
+            <li>建议先给一个只读 Token 试水，确认脚本行为再换可写 Token。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-n">05 — FAQ</div>
+      <h2>常见卡点</h2>
+    </div>
+    <div class="card">
+      <details open>
+        <summary>Windows 上跑 <code>python</code> 没反应，或报 9009？</summary>
+        <p>大概率是 Microsoft Store 的别名桩。装一个真 Python：<code>winget install -e --id Python.Python.3.12</code>，装完重开终端。</p>
+      </details>
+      <details>
+        <summary>返回 401，是 Token 错了吗？</summary>
+        <p>401 通常是 Token 失效或 Scope 不足。去设置页重建，注意读写权限要单独勾。只读 Token 调 <code>doc-create</code> 也会 401/403。</p>
+      </details>
+      <details>
+        <summary>新建的文档在哪？目录里找不到</summary>
+        <p>创建文档不会自动挂到目录。先拿 <code>doc-create</code> 返回的 <code>id</code>，再调 <code>toc-update --action appendNode --doc-ids &lt;id&gt;</code>。</p>
+      </details>
+      <details>
+        <summary>能不能在网页里直接调？</summary>
+        <p>不行。语雀 API 不返回 <code>Access-Control-Allow-Origin</code>，浏览器会拦截跨域响应。用第三方代理等于把 Token 交给别人，不建议。所以这个 skill 走本地 CLI。</p>
+      </details>
+      <details>
+        <summary>知识库和文档的 slug 怎么找？</summary>
+        <p><code>repos &lt;login&gt;</code> 拿知识库 slug，<code>docs &lt;group&gt; &lt;repo&gt;</code> 拿文档 slug。数字 id 也能用，两种寻址等价。</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="foot-in">
+    <span>Yuque Skill · MIT License</span>
+    <span>基于语雀 OpenAPI v2</span>
+    <a href="https://www.yuque.com/settings/tokens" target="_blank" rel="noopener">获取 Token</a>
+    <a href="https://www.yuque.com/yuque/developer/api" target="_blank" rel="noopener">API 文档</a>
+  </div>
+</footer>
+
+<script>
+const CMDS = [
+  ["whoami", "当前 Token 对应用户", "read", "GET /user"],
+  ["groups", "用户加入的团队列表", "read", "GET /users/{login}/groups"],
+  ["group-members", "团队成员列表", "read", "GET /groups/{login}/users"],
+  ["repos", "列出知识库", "read", "GET /users/{login}/repos"],
+  ["repo", "知识库详情", "read", "GET /repos/{g}/{s}"],
+  ["docs", "文档列表（分页）", "read", "GET /repos/{g}/{s}/docs"],
+  ["doc", "文档详情（含正文）", "read", "GET /repos/{g}/{s}/docs/{d}"],
+  ["toc", "目录树", "read", "GET /repos/{g}/{s}/toc"],
+  ["notes", "小记列表", "read", "GET /notes"],
+  ["note", "小记详情", "read", "GET /notes/{id}"],
+  ["statistics", "团队统计", "read", "GET /groups/{login}/statistics"],
+  ["repo-create", "创建知识库", "write", "POST /users/{login}/repos"],
+  ["repo-update", "更新知识库", "write", "PUT /repos/{g}/{s}"],
+  ["doc-create", "创建文档", "write", "POST /repos/{g}/{s}/docs"],
+  ["doc-update", "更新文档正文", "write", "PUT /repos/{g}/{s}/docs/{d}"],
+  ["toc-update", "调整目录节点", "write", "PUT /repos/{g}/{s}/toc"],
+  ["note-create", "写一条小记", "write", "POST /notes"],
+  ["repo-delete", "删除知识库", "del", "DELETE /repos/{g}/{s}"],
+  ["doc-delete", "删除文档", "del", "DELETE /repos/{g}/{s}/docs/{d}"],
+  ["raw", "任意接口直通", "any", "任意 /api/v2 路径"]
+];
+
+const RISK = {
+  read:  ['只读', 'b-info'],
+  write: ['写入', 'b-warn'],
+  del:   ['删除', 'b-err'],
+  any:   ['通用', 'b-purple']
+};
+
+const el = (id) => document.getElementById(id);
+let filter = 'all';
+
+const counts = { all: CMDS.length, read: 0, write: 0, del: 0, any: 0 };
+CMDS.forEach(c => counts[c[2]]++);
+
+el('riskChips').innerHTML = [
+  ['all', '全部'], ['read', '只读'], ['write', '写入'], ['del', '删除'], ['any', '通用']
+].map(([k, label]) =>
+  `<button class="chip" aria-pressed="${k === 'all'}" data-risk="${k}">${label}<span>${counts[k]}</span></button>`
+).join('');
+
+function renderCmds() {
+  el('cmdRows').innerHTML = CMDS.filter(c => filter === 'all' || c[2] === filter).map(c => {
+    const [lbl, cls] = RISK[c[2]];
+    return `<tr>
+      <td class="mono" style="color:var(--acc)">${c[0]}</td>
+      <td class="dim">${c[1]}</td>
+      <td><span class="b ${cls}">${lbl}</span></td>
+      <td class="mono faint" style="font-size:11.6px">${c[3]}</td>
+    </tr>`;
+  }).join('');
+}
+renderCmds();
+
+el('riskChips').addEventListener('click', (e) => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  filter = b.dataset.risk;
+  [...el('riskChips').children].forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  renderCmds();
+});
+
+/* 安装片段 */
+const SNIP = {
+  ps: {
+    token:
+`# 写进用户级环境变量，新开终端自动生效
+[Environment]::SetEnvironmentVariable('YUQUE_TOKEN', '你的 token', 'User')
+
+# 仅当前窗口生效（临时测试）
+$env:YUQUE_TOKEN = '你的 token'`,
+    run:
+`python "$env:USERPROFILE\\.workbuddy\\skills\\yuque\\scripts\\yuque.py" whoami`
+  },
+  bash: {
+    token:
+`# 追加到 ~/.bashrc 或 ~/.zshrc
+export YUQUE_TOKEN="你的 token"
+
+# 然后 source 一下
+source ~/.zshrc`,
+    run:
+`python3 "$HOME/.workbuddy/skills/yuque/scripts/yuque.py" whoami`
+  }
+};
+
+let shell = 'ps';
+
+function renderSnip() {
+  el('c2').textContent = SNIP[shell].token;
+  el('c3').textContent = SNIP[shell].run;
+}
+renderSnip();
+
+document.querySelectorAll('#shellTabs [role=tab]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    shell = btn.dataset.sh;
+    document.querySelectorAll('#shellTabs [role=tab]').forEach(b =>
+      b.setAttribute('aria-selected', String(b === btn)));
+    renderSnip();
+  });
+});
+
+/* 复制 */
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.copy'); if (!btn) return;
+  const text = el(btn.dataset.copy).textContent;
+  try { await navigator.clipboard.writeText(text); }
+  catch {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove();
+  }
+  const old = btn.textContent;
+  btn.textContent = '已复制'; btn.classList.add('done');
+  setTimeout(() => { btn.textContent = old; btn.classList.remove('done'); }, 1400);
+});
+</script>
+</body>
+</html>
