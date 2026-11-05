@@ -12,3 +12,9 @@ desktop.ini
 *.log
 *.tmp
 node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
