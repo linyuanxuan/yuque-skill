@@ -157,4 +157,4 @@ python3 scripts/yuque.py toc <team> <repo>
 
 ## 许可
 
-[MIT](LICENSE)
+[MIT](LICENSE) © [linyuanxuan](https://github.com/linyuanxuan)
